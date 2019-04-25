@@ -6,22 +6,13 @@ import json
 import MySQLdb
 from MySQLdb import cursors
 from scrapy.pipelines.images import ImagesPipeline
-from dotenv import load_dotenv
 from twisted.enterprise import adbapi
 
 from .settings import PROJECT_DIR
 
 
-# 从 .env 文件加载环境变量
-load_dotenv()
-
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
-
-
-class JobbolePipeline(object):
-    def process_item(self, item, spider):
-        return item
 
 
 class JobboleArticleImagePipeline(ImagesPipeline):
@@ -46,7 +37,30 @@ class JobboleArticleJsonExporterPipeline(object):
         self._file.close()
 
 
-class JobboleAsyncMySQLExporterPipeline(object):
+class SyncMySQLExporterPipeline(object):
+    def __init__(self):
+        self._conn = MySQLdb.connect(
+            host=os.environ['MYSQL_HOST'],
+            port=int(os.environ['MYSQL_PORT']),
+            user=os.environ['MYSQL_USER'],
+            passwd=os.environ['MYSQL_PASSWORD'],
+            db=os.environ['MYSQL_DB'],
+            connect_timeout=60,
+            charset='utf8mb4',
+            use_unicode=True
+        )
+        self._cursor = self._conn.cursor()
+
+    def process_item(self, item, spider):
+        insert_sql, params = item.get_insert_sql()
+        self._cursor.execute(
+            insert_sql,
+            params
+        )
+        self._conn.commit()
+
+
+class AsyncMySQLExporterPipeline(object):
     """使用 Twisted 的异步机制写入数据库"""
     def __init__(self):
         db_options = dict(
@@ -64,67 +78,13 @@ class JobboleAsyncMySQLExporterPipeline(object):
         self._db_pool = adbapi.ConnectionPool('MySQLdb', **db_options)
 
     def process_item(self, item, spider):
-        deferred = self._db_pool.runInteraction(self.insert_record, item)
+        deferred = self._db_pool.runInteraction(self.do_insert, item)
         deferred.addErrback(self.handle_error)
 
     def handle_error(self, failure):
         """处理数据库异步操作的异常"""
         print(failure)
 
-    def insert_record(self, cursor, item):
-        table = os.environ['JOBBOLE_TABLE']
-        insert_sql = \
-            f'INSERT INTO `{table}`(page_url, page_url_object_id, cover_url, title, create_time, tags, content, comment_num, upvote_num, collection_num)' \
-            f'VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
-        cursor.execute(
-            insert_sql,
-            (
-                item['page_url'],
-                item['page_url_object_id'],
-                item['cover_url'],
-                item['title'],
-                item['create_time'],
-                item['tags'],
-                item['content'],
-                item['comment_num'],
-                item['upvote_num'],
-                item['collection_num']
-            )
-        )
-
-
-class JobboleSyncMySQLExporterPipeline(object):
-    def __init__(self):
-        self._conn = MySQLdb.connect(
-            host=os.environ['MYSQL_HOST'],
-            port=int(os.environ['MYSQL_PORT']),
-            user=os.environ['MYSQL_USER'],
-            passwd=os.environ['MYSQL_PASSWORD'],
-            db=os.environ['MYSQL_DB'],
-            connect_timeout=60,
-            charset='utf8mb4',
-            use_unicode=True
-        )
-        self._cursor = self._conn.cursor()
-
-    def process_item(self, item, spider):
-        table = os.environ['JOBBOLE_TABLE']
-        insert_sql = \
-            f'INSERT INTO `{table}`(page_url, page_url_object_id, cover_url, title, create_time, tags, content, comment_num, upvote_num, collection_num)' \
-            f'VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
-        self._cursor.execute(
-            insert_sql,
-            (
-                item['page_url'],
-                item['page_url_object_id'],
-                item['cover_url'],
-                item['title'],
-                item['create_time'],
-                item['tags'],
-                item['content'],
-                item['comment_num'],
-                item['upvote_num'],
-                item['collection_num']
-            )
-        )
-        self._conn.commit()
+    def do_insert(self, cursor, item):
+        insert_sql, params = item.get_insert_sql()
+        cursor.execute(insert_sql, params)

@@ -17,3 +17,7 @@ venv/
 
 scrapy_spider/jsons/
 scrapy_spider/images/
+
+zhihu.cookie
+
+images/

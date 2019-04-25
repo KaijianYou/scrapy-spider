@@ -2,6 +2,8 @@
 
 import os
 
+from dotenv import load_dotenv
+
 # Scrapy settings for scrapy_spider project
 #
 # For simplicity, this file contains only settings considered important or
@@ -16,10 +18,12 @@ BOT_NAME = 'scrapy_spider'
 SPIDER_MODULES = ['scrapy_spider.spiders']
 NEWSPIDER_MODULE = 'scrapy_spider.spiders'
 
-PROJECT_DIR = os.path.abspath(os.path.dirname(__file__))
+PROJECT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+JOBBOLE_IMAGE_DIR = os.path.join(os.path.join(PROJECT_DIR, 'images'), 'jobbole')
+ZHIHU_IMAGE_DIR = os.path.join(os.path.join(PROJECT_DIR, 'images'), 'zhihu')
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = 'scrapy_spider (+http://www.yourdomain.com)'
+USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
@@ -36,7 +40,8 @@ ROBOTSTXT_OBEY = False
 #CONCURRENT_REQUESTS_PER_IP = 16
 
 # Disable cookies (enabled by default)
-#COOKIES_ENABLED = False
+COOKIES_ENABLED = True
+COOKIES_DEBUG = True
 
 # Disable Telnet Console (enabled by default)
 #TELNETCONSOLE_ENABLED = False
@@ -55,9 +60,10 @@ ROBOTSTXT_OBEY = False
 
 # Enable or disable downloader middlewares
 # See https://doc.scrapy.org/en/latest/topics/downloader-middleware.html
-#DOWNLOADER_MIDDLEWARES = {
-#    'scrapy_spider.middlewares.ScrapySpiderDownloaderMiddleware': 543,
-#}
+DOWNLOADER_MIDDLEWARES = {
+    # 'scrapy_spider.middlewares.ScrapySpiderDownloaderMiddleware': 543,
+    'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': 1,
+}
 
 # Enable or disable extensions
 # See https://doc.scrapy.org/en/latest/topics/extensions.html
@@ -71,8 +77,7 @@ ITEM_PIPELINES = {
     # 'scrapy.pipelines.images.ImagesPipeline': 1,
     # 'scrapy_spider.pipelines.JobboleArticleImagePipeline': 1,
     # 'scrapy_spider.pipelines.JobboleArticleJsonExporterPipeline': 2,
-    'scrapy_spider.pipelines.JobbolePipeline': 300,
-    'scrapy_spider.pipelines.JobboleAsyncMySQLExporterPipeline': 1,
+    'scrapy_spider.pipelines.AsyncMySQLExporterPipeline': 1,
 }
 IMAGES_URLS_FIELD = 'cover_url'
 IMAGES_STORE = os.path.join(PROJECT_DIR, 'images')
@@ -97,3 +102,10 @@ IMAGES_STORE = os.path.join(PROJECT_DIR, 'images')
 #HTTPCACHE_DIR = 'httpcache'
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
+
+
+# 从 .env 文件加载环境变量
+load_dotenv()
+
+DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+DATE_FORMAT = '%Y-%m-%d'
