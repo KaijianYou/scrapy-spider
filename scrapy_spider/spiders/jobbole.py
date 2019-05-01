@@ -7,7 +7,7 @@ from scrapy.http import Request
 
 from scrapy_spider.items import JobboleArticleItem
 from scrapy.loader import ItemLoader
-from utils.common import get_md5
+from utils.tool import get_md5
 
 
 class JobboleSpider(scrapy.Spider):

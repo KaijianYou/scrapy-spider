@@ -12,6 +12,7 @@ from typing import Tuple
 
 import scrapy
 from scrapy.loader.processors import MapCompose, Join, TakeFirst
+from w3lib.html import remove_tags
 
 from .settings import DATE_FORMAT, DATETIME_FORMAT
 
@@ -147,6 +148,102 @@ class ZhihuAnswerItem(scrapy.Item):
             self['upvote_num'],
             datetime.fromtimestamp(self['create_time']).strftime(DATETIME_FORMAT),
             datetime.fromtimestamp(self['update_time']).strftime(DATETIME_FORMAT),
+            self['crawl_time'].strftime(DATETIME_FORMAT)
+        )
+        return insert_sql, params
+
+
+def remove_slash(s: str) -> str:
+    return s.replace('/', '')
+
+
+def trim_space(s: str) -> str:
+    return s.strip()
+
+
+def structured_work_address(addr: str) -> str:
+    addrs = addr.split('\n')
+    addrs = [addr.strip() for addr in addrs if addr.strip() != '查看地图']
+    return ''.join(addrs)
+
+
+class LagouJobItem(scrapy.Item):
+    page_url = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    page_url_object_id = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    title = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    salary = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    city = scrapy.Field(
+        input_processor=MapCompose(remove_slash, trim_space),
+        output_processor=TakeFirst()
+    )
+    years_of_working = scrapy.Field(
+        input_processor=MapCompose(remove_slash, trim_space),
+        output_processor=TakeFirst()
+    )
+    edu_requirement = scrapy.Field(
+        input_processor=MapCompose(remove_slash, trim_space),
+        output_processor=TakeFirst()
+    )
+    type = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    publish_time = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    tags = scrapy.Field(
+        output_processor=Join(',')
+    )
+    advantage = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    desc = scrapy.Field(
+        input_processor=MapCompose(remove_tags),
+        output_processor=TakeFirst()
+    )
+    work_addr = scrapy.Field(
+        input_processor=MapCompose(remove_tags, structured_work_address, lambda s: s.replace(' ', '')),
+        output_processor=TakeFirst()
+    )
+    company_url = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    company_name = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+    crawl_time = scrapy.Field(
+        output_processor=TakeFirst()
+    )
+
+    def get_insert_sql(self) -> Tuple[str, Tuple]:
+        table = os.environ['LAGOU_JOB_TABLE']
+        insert_sql = \
+            f'INSERT INTO `{table}`(page_url, page_url_object_id, title, salary, city, years_of_working, edu_requirement, `type`, publish_time, tags, advantage, `desc`, work_addr, company_url, company_name, crawl_time)' \
+            f'VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ' \
+            f'ON DUPLICATE KEY UPDATE salary=VALUES(salary), publish_time=VALUES(publish_time), tags=VALUES(tags), advantage=VALUES(advantage), `desc`=VALUES(`desc`), crawl_time=VALUES(crawl_time)'
+        params = (
+            self['page_url'],
+            self['page_url_object_id'],
+            self['title'],
+            self['salary'].strip(),
+            self['city'],
+            self['years_of_working'],
+            self['edu_requirement'],
+            self['type'],
+            self['publish_time'],
+            self['tags'],
+            self['advantage'],
+            self['desc'],
+            self['work_addr'],
+            self['company_url'],
+            self['company_name'],
             self['crawl_time'].strftime(DATETIME_FORMAT)
         )
         return insert_sql, params

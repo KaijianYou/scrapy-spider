@@ -5,6 +5,9 @@
 # See documentation in:
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
+import time
+import random
+
 from scrapy import signals
 
 
@@ -101,3 +104,21 @@ class ScrapySpiderDownloaderMiddleware(object):
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
+
+
+class RandomDelayMiddleware:
+    """随机延时"""
+    def __init__(self, delay):
+        self._delay = delay
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        delay = crawler.spider.settings.get("RANDOM_DELAY", 15)
+        if not isinstance(delay, int):
+            raise ValueError("RANDOM_DELAY need a int")
+        return cls(delay)
+
+    def process_request(self, request, spider):
+        delay = random.randint(5, self._delay)
+        print("DEBUG random delay: %ss" % delay)
+        time.sleep(delay)

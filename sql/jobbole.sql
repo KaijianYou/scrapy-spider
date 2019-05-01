@@ -14,5 +14,6 @@ CREATE TABLE IF NOT EXISTS `jobbole_article` (
     `comment_num` INT,
     `upvote_num` INT,
     `collection_num` INT,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY (`page_url_object_id`),
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

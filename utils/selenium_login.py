@@ -3,52 +3,46 @@ import time
 import pickle
 from typing import Dict
 
-from scrapy_spider.settings import PROJECT_DIR, ZHIHU_IMAGE_DIR
+from scrapy_spider.settings import BASE_DIR, ZHIHU_IMAGE_DIR
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 from selenium import webdriver
 from pymouse import PyMouse
 
 from utils.zheye import zheye
-from utils.common import save_img_from_base64_text
+from utils.tool import save_img_from_base64_text
 from utils.yundama_request import YDMRequest
 
 
-def create_chrome_browser():
-    chrome_options = Options()
-    chrome_options.add_argument('--disable-extensions')
-    chrome_options.add_experimental_option('debuggerAddress', '127.0.0.1:9222')
-    return webdriver.Chrome(chrome_options=chrome_options)
+def create_chrome_browser(automatic=True):
+    if automatic:
+        return webdriver.Chrome()
+    else:
+        chrome_options = Options()
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_experimental_option('debuggerAddress', '127.0.0.1:9222')
+        return webdriver.Chrome(chrome_options=chrome_options)
 
 
-def input_login_info(browser):
+def login_lagou(browser):
+    """利用 Selenium 模拟登录拉勾"""
+    account_input = browser.find_element_by_css_selector('.form_body .input_white[type="text"]')
+    password_input = browser.find_element_by_css_selector('.form_body input[type="password"]')
+    submit_button = browser.find_element_by_css_selector('div[data-view="passwordLogin"] input.btn_lg')
 
-    account_input = browser.find_element_by_css_selector('.SignFlow-accountInput input[name="username"]')
-    password_input = browser.find_element_by_css_selector('.SignFlow-password input[name="password"]')
-    submit_button = browser.find_element_by_css_selector('button.SignFlow-submitButton')
-
-    account_input.send_keys(os.environ['ZHIHU_ACCOUNT'])
-    # 先提交错误密码，使验证码出现
-    password_input.send_keys(os.environ['ZHIHU_WRONG_PASSWORD'])
+    account_input.send_keys(os.environ['LAGOU_ACCOUNT'])
+    time.sleep(2)
+    password_input.send_keys(os.environ['LAGOU_PASSWORD'])
+    time.sleep(2)
     submit_button.click()
 
-    time.sleep(3)
 
-    password_input.send_keys(os.environ['ZHIHU_CORRECT_PASSWORD'])
-    submit_button.click()
-
-    time.sleep(8)  # 等待可能登录成功后的页面加载
-
-
-def get_zhihu_cookie() -> Dict[str, str]:
-    """获取登录知乎的 Cookie
-    知乎可以检测到 Selenium
-    1. 手动启动 Chrome（通过命令：chrome.exe --remote-debugging-port=9222 --user-data-dir=remote-profile）
-    2. 确保上一步成功后再执行此函数
-    """
-    zhihu_cookie_path = os.path.join(PROJECT_DIR, 'zhihu.cookie')
-    if os.path.isfile(zhihu_cookie_path):
-        with open(zhihu_cookie_path, 'rb') as f:
+def get_lagou_cookie() -> Dict[str, str]:
+    """获取拉勾网登录后的 Cookie"""
+    cookie_path = os.path.join(BASE_DIR, 'lagou.cookie')
+    # TODO: Cookie 失效的情况
+    if os.path.isfile(cookie_path):
+        with open(cookie_path, 'rb') as f:
             cookies = pickle.load(f)
     else:
         browser = create_chrome_browser()
@@ -57,10 +51,65 @@ def get_zhihu_cookie() -> Dict[str, str]:
         except Exception:
             pass
 
+        browser.get('https://passport.lagou.com/login/login.html')
+        login_lagou(browser)
+        time.sleep(10)  # 等待可能登录成功后的页面加载
+
+        cookies = browser.get_cookies()
+        browser.quit()
+        with open(cookie_path, 'wb') as f:
+            pickle.dump(cookies, f)
+
+    cookie_dict = {}
+    for cookie in cookies:
+        cookie_dict[cookie['name']] = cookie['value']
+
+    return cookie_dict
+
+
+def login_zhihu(browser):
+    """利用 Selenium 模拟登录知乎"""
+    account_input = browser.find_element_by_css_selector('.SignFlow-accountInput input[name="username"]')
+    password_input = browser.find_element_by_css_selector('.SignFlow-password input[name="password"]')
+    submit_button = browser.find_element_by_css_selector('button.SignFlow-submitButton')
+
+    account_input.send_keys(Keys.COMMAND + 'a')
+    account_input.send_keys(os.environ['ZHIHU_ACCOUNT'])
+    # 先提交错误密码，使验证码出现
+    account_input.send_keys(Keys.COMMAND + 'a')
+    password_input.send_keys(os.environ['ZHIHU_WRONG_PASSWORD'])
+    submit_button.click()
+
+    time.sleep(2)
+
+    account_input.send_keys(Keys.COMMAND + 'a')
+    password_input.send_keys(os.environ['ZHIHU_CORRECT_PASSWORD'])
+    submit_button.click()
+
+
+def get_zhihu_cookie() -> Dict[str, str]:
+    """获取知乎登录后的 Cookie
+    知乎可以检测到 Selenium
+    1. 手动启动 Chrome（通过命令：chrome.exe --remote-debugging-port=9222 --user-data-dir=remote-profile）
+    2. 确保上一步成功后再执行此函数
+    """
+    cookie_path = os.path.join(BASE_DIR, 'zhihu.cookie')
+    # TODO: Cookie 失效的情况
+    if os.path.isfile(cookie_path):
+        with open(cookie_path, 'rb') as f:
+            cookies = pickle.load(f)
+    else:
+        browser = create_chrome_browser(automatic=False)
+        try:
+            browser.maximize_window()
+        except Exception:
+            pass
+
         m = PyMouse()
 
         browser.get('https://www.zhihu.com/signin')
-        input_login_info(browser)
+        login_zhihu(browser)
+        time.sleep(10)  # 等待可能登录成功后的页面加载
 
         browser_nav_panel_height = browser.execute_script('return window.outerHeight - window.innerHeight;')
 
@@ -118,14 +167,16 @@ def get_zhihu_cookie() -> Dict[str, str]:
                     m.move(left+position[1]/2, top+browser_nav_panel_height+position[0]/2+captcha_hint_height)
                     m.click(left+position[1]/2, top+browser_nav_panel_height+position[0]/2+captcha_hint_height)
 
-            input_login_info()
+            login_zhihu(browser)
+            time.sleep(8)  # 等待可能登录成功后的页面加载
+
         time.sleep(15)
 
         browser.get('https://www.zhihu.com/')
         cookies = browser.get_cookies()
 
         browser.quit()
-        with open(zhihu_cookie_path, 'wb') as f:
+        with open(cookie_path, 'wb') as f:
             pickle.dump(cookies, f)
 
     cookie_dict = {}
@@ -133,6 +184,3 @@ def get_zhihu_cookie() -> Dict[str, str]:
         cookie_dict[cookie['name']] = cookie['value']
 
     return cookie_dict
-
-
-get_zhihu_cookie()

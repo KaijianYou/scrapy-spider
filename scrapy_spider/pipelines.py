@@ -8,7 +8,7 @@ from MySQLdb import cursors
 from scrapy.pipelines.images import ImagesPipeline
 from twisted.enterprise import adbapi
 
-from .settings import PROJECT_DIR
+from .settings import BASE_DIR
 
 
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
@@ -25,7 +25,7 @@ class JobboleArticleImagePipeline(ImagesPipeline):
 
 class JobboleArticleJsonExporterPipeline(object):
     def __init__(self):
-        dir_path = os.path.join(PROJECT_DIR, 'jsons')
+        dir_path = os.path.join(BASE_DIR, 'jsons')
         self._file = open(os.path.join(dir_path, 'jobbole_article.json'), 'w', encoding='utf-8')
 
     def process_item(self, item, spider):

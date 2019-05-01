@@ -37,7 +37,8 @@ class ZhihuSpider(scrapy.Spider):
 
     def start_requests(self):
         cookie_dict = get_zhihu_cookie()
-        return [scrapy.Request(url=self.start_urls[0], dont_filter=True, cookies=cookie_dict)]
+        for url in self.start_urls:
+            yield [scrapy.Request(url=url, dont_filter=True, cookies=cookie_dict)]
 
     def parse(self, response):
         all_urls = response.css('a::attr(href)').extract()
@@ -49,8 +50,7 @@ class ZhihuSpider(scrapy.Spider):
                 request_url = re_match.group(1)
                 yield Request(request_url, headers=self.headers, callback=self.parse_question)
             else:
-                pass
-                # yield Request(url, headers=self.headers, callback=self.parse)
+                yield Request(url, headers=self.headers, callback=self.parse)
 
     def parse_question(self, response):
         re_match = re.match('.*zhihu.com/question/(\d+)(/|$).*', response.url)
@@ -69,9 +69,8 @@ class ZhihuSpider(scrapy.Spider):
         item_loader.add_css('view_num', '.NumberBoard-itemValue::attr(title)')
         item_loader.add_css('follower_num', '.NumberBoard-itemValue::attr(title)')
         item_loader.add_value('crawl_time', datetime.utcnow())
-
-        question_item = item_loader.load_item()
-        yield question_item
+        item = item_loader.load_item()
+        yield item
         yield Request(
             self.start_answer_url.format(question_id, 0, 20),
             headers=self.headers,

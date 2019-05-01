@@ -19,5 +19,6 @@ scrapy_spider/jsons/
 scrapy_spider/images/
 
 zhihu.cookie
+lagou.cookie
 
 images/
